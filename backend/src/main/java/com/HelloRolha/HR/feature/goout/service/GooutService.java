@@ -1,6 +1,8 @@
 package com.HelloRolha.HR.feature.goout.service;
 
 
+import com.HelloRolha.HR.error.BusinessException;
+import com.HelloRolha.HR.error.ErrorCode;
 import com.HelloRolha.HR.feature.employee.model.dto.EmployeeDto;
 import com.HelloRolha.HR.feature.employee.model.entity.Employee;
 import com.HelloRolha.HR.feature.employee.repo.EmployeeRepository;
@@ -21,6 +23,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -51,34 +54,53 @@ public class GooutService {
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
 
-    public GooutCreateRes create(GooutCreateReq gooutCreateReq) {
-        // 1. 휴가 신청자의 이전 휴가 사용 일수 계산
-        int currentYear = LocalDate.now().getYear(); // 현재 연도
+    private void validateGooutCreateReq(GooutCreateReq gooutCreateReq) {
+        if (gooutCreateReq == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "휴가 신청 정보는 null일 수 없습니다.");
+        }
+        if (gooutCreateReq.getAgentId() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "대리자 ID는 null일 수 없습니다.");
+        }
+        if (gooutCreateReq.getEmployeeId() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "직원 ID는 null일 수 없습니다.");
+        }
+
+        if (gooutCreateReq.getWriterId() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "작성자 ID는 null일 수 없습니다.");
+        }
+
+        if (gooutCreateReq.getGooutTypeId() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "휴가타입 ID는 null일 수 없습니다.");
+        }
+
+        if (gooutCreateReq.getFirst() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "시작날짜는 null일 수 없습니다.");
+        }
+
+        if (gooutCreateReq.getLast() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "종료날짜는 null일 수 없습니다.");
+        }
+
+        if (gooutCreateReq.getConfirmer1Id() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "결재자1은 null일 수 없습니다.");
+        }
+
+        if (gooutCreateReq.getConfirmer2Id() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "결재자2는 null일 수 없습니다.");
+        }
+
+        int currentYear = LocalDate.now().getYear();
         int usedVacationDays = calculateApprovedVacationDays(gooutCreateReq.getEmployeeId(), gooutCreateReq.getGooutTypeId(), currentYear);
-
-        // 2. 신청 휴가 기간 계산
         long requestedDays = ChronoUnit.DAYS.between(gooutCreateReq.getFirst(), gooutCreateReq.getLast().plusDays(1)); // 종료 날짜 포함하여 계산
-
-        // 3. 최대 허용 휴가 일수 검사
         int maxHoliday = gooutTypeRepository.findMaxHolidayByGooutTypeId(gooutCreateReq.getGooutTypeId());
         if ((usedVacationDays + requestedDays) > maxHoliday) {
-            throw new IllegalArgumentException("휴가 일수가 최대 허용 일수를 초과합니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "휴가 일수가 최대 허용 일수를 초과합니다.");
         }
+    }
 
-        // 4. 휴가 신청
-        Objects.requireNonNull(gooutCreateReq, "gooutCreateReq는 null일 수 없습니다.");
-        Objects.requireNonNull(gooutCreateReq.getAgentId(), "대리자 ID는 null일 수 없습니다.");
-        Objects.requireNonNull(gooutCreateReq.getEmployeeId(), "직원 ID는 null일 수 없습니다.");
-        Objects.requireNonNull(gooutCreateReq.getWriterId(), "작성자 ID는 null일 수 없습니다.");
-        Objects.requireNonNull(gooutCreateReq.getGooutTypeId(), "휴가타입 ID는 null일 수 없습니다.");
-        Objects.requireNonNull(gooutCreateReq.getFirst(), "시작날짜는 null일 수 없습니다.");
-        Objects.requireNonNull(gooutCreateReq.getLast(), "종료날짜는 null일 수 없습니다.");
-        Objects.requireNonNull(gooutCreateReq.getConfirmer1Id(), "결재자1은 null일 수 없습니다.");
-        Objects.requireNonNull(gooutCreateReq.getConfirmer2Id(), "결재자2는 null일 수 없습니다.");
+    public GooutCreateRes create(GooutCreateReq gooutCreateReq) {
 
-        if (gooutCreateReq.getAgentId().equals(gooutCreateReq.getEmployeeId())) {
-            throw new IllegalArgumentException("대리자의 ID와 신청직원의 ID는 같을 수 없습니다.");
-        }
+        validateGooutCreateReq(gooutCreateReq);
 
         GooutCreateRes gooutCreateRes = GooutCreateRes.builder().build();
 
@@ -117,14 +139,12 @@ public class GooutService {
     }
 
     @Transactional
-    public List<GooutList> list(Integer page, Integer size) {
-
-        Pageable pageable = PageRequest.of(page-1, size);
+    public GooutListRes list(Integer page, Integer size) {
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("id").descending());
         Page<Goout> gooutPage = gooutRepository.findList(pageable);
 
-            List<GooutList> gooutLists = new ArrayList<>();
-
-        for (Goout goout : gooutPage) {
+        List<GooutList> gooutLists = new ArrayList<>();
+        for (Goout goout : gooutPage.getContent()) { // getContent()로 Page 내용물 접근
             Employee employee = goout.getEmployee();
             Employee writer = goout.getWriter();
             GooutType gooutType = goout.getGooutType();
@@ -141,7 +161,11 @@ public class GooutService {
                 gooutLists.add(gooutList);
             }
         }
-        return gooutLists;
+
+        return GooutListRes.builder()
+                .goouts(gooutLists)
+                .totalElements(gooutPage.getTotalElements()) // 전체 요소의 수
+                .build();
     }
 
     @Transactional
