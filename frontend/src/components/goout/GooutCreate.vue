@@ -225,8 +225,12 @@ export default {
         alert("휴가가 등록되었습니다.");
         this.$router.push(`/goout/list`);
       } catch (error) {
-        console.error("휴가 등록 실패:", error);
-        alert("휴가 등록 실패: " + error.response.data.message); // 서버에서 반환한 오류 메시지를 사용자에게 보여줌
+        if (error.response && error.response.data) {
+          // 서버로부터 받은 에러 메시지를 alert로 표시
+          alert(`에러: ${error.response.data.message}`);
+        } else {
+          alert("휴가 등록 중 문제가 발생했습니다.");
+        }
       }
     },
 

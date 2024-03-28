@@ -12,6 +12,7 @@
       <table>
         <thead>
           <tr>
+            <th>게시글 번호</th>
             <th>이름</th>
             <th>작성자 이름</th>
             <th>휴가 유형</th>
@@ -21,7 +22,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="goout in filteredGoouts" :key="goout.id" @click="goToGooutReadPage(goout.id)" class="gooutItem">
+          <tr
+            v-for="goout in filteredGoouts"
+            :key="goout.id"
+            @click="goToGooutReadPage(goout.id)"
+            class="gooutItem"
+          >
+            <td style="text-align: center">{{ goout.id }}</td>
             <td>{{ goout.name }}</td>
             <td>{{ goout.writerName }}</td>
             <td>{{ goout.gooutTypeName }}</td>
@@ -31,29 +38,29 @@
           </tr>
         </tbody>
       </table>
-  </div>
-  <div class="pagination">
-    <button @click="prevGroup">이전</button>
-    <button
-      v-for="page in pageGroup"
-      :key="page"
-      :class="{ 'active': page === currentPage }"
-      @click="changePage(page)"
-    >
-      {{ page }}
-    </button>
-    <button @click="nextGroup">이후</button>
-  </div>
+    </div>
+    <div class="pagination">
+      <button @click="prevGroup">이전</button>
+      <button
+        v-for="page in pageGroup"
+        :key="page"
+        :class="{ active: page === currentPage }"
+        @click="changePage(page)"
+      >
+        {{ page }}
+      </button>
+      <button @click="nextGroup">이후</button>
+    </div>
 
-   <div class="button-container2">
+    <div class="button-container2">
       <button @click="goToGooutCreate">휴가 등록</button>
     </div>
-</div>
+  </div>
 </template>
 <script>
-import axios from 'axios';
+import axios from "axios";
 export default {
-  name: 'VacationPage',
+  name: "VacationPage",
   data() {
     return {
       goouts: [],
@@ -62,25 +69,29 @@ export default {
       pageSize: 10,
       pagesToShow: 5,
       pageGroupStart: 1, // 페이지 그룹의 시작 페이지 번호
-    }
+      totalPages: 0, // 전체 페이지 수
+    };
   },
   created() {
     this.fetchGoouts();
   },
   computed: {
     pageGroup() {
-    // 현재 페이지가 포함된 페이지 그룹의 시작 페이지를 계산합니다.
-    let startPage = Math.floor((this.currentPage - 1) / this.pagesToShow) * this.pagesToShow + 1;
-    // 시작 페이지를 기준으로 pagesToShow만큼의 페이지 번호를 생성합니다.
-    // 단, 전체 페이지 수를 초과하지 않도록 주의합니다.
-    let pages = [];
-    for (let i = 0; i < this.pagesToShow; i++) {
-      let page = startPage + i;
-      if (page > this.totalPages) break; // 전체 페이지 수를 초과하지 않도록 합니다.
-      pages.push(page);
-    }
-    return pages;
-  },
+      // 현재 페이지가 포함된 페이지 그룹의 시작 페이지를 계산합니다.
+      let startPage =
+        Math.floor((this.currentPage - 1) / this.pagesToShow) *
+          this.pagesToShow +
+        1;
+      // 시작 페이지를 기준으로 pagesToShow만큼의 페이지 번호를 생성합니다.
+      // 단, 전체 페이지 수를 초과하지 않도록 주의합니다.
+      let pages = [];
+      for (let i = 0; i < this.pagesToShow; i++) {
+        let page = startPage + i;
+        if (page > this.totalPages) break; // 전체 페이지 수를 초과하지 않도록 합니다.
+        pages.push(page);
+      }
+      return pages;
+    },
   },
   methods: {
     changePage(page) {
@@ -97,7 +108,7 @@ export default {
     },
     nextGroup() {
       // 다음 그룹으로 이동 (페이지 번호 배열만 +5)
-      if (this.pageGroupStart + this.pagesToShow <= 100) {
+      if (this.pageGroupStart + this.pagesToShow <= this.totalPages) {
         this.pageGroupStart += this.pagesToShow;
         // 현재 페이지도 페이지 그룹의 첫 페이지로 설정
         this.changePage(this.pageGroupStart);
@@ -106,14 +117,14 @@ export default {
 
     getStatusText(status) {
       const statusMap = {
-        0: '대기중',
-        1: '기안중',
-        2: '최종 승인',
-        3: '반려',
-        4: '등록 취소'
+        0: "대기중",
+        1: "기안중",
+        2: "최종 승인",
+        3: "반려",
+        4: "등록 취소",
         // 필요한 다른 상태들...
       };
-      return statusMap[status] || '알 수 없음';
+      return statusMap[status] || "알 수 없음";
     },
     goToGooutCreate() {
       this.$router.push("/goout/create");
@@ -126,10 +137,11 @@ export default {
             size: this.pageSize,
           },
         });
-        this.goouts = response.data.result;
-        this.filteredGoouts = this.goouts;
-        // Assuming the response includes total pages information
-        this.totalPages = response.data.totalPages;
+        const data = response.data.result; // 결과 데이터 구조에 따라 조정 필요
+        this.goouts = data.goouts;
+        this.filteredGoouts = data.goouts;
+            // 총 페이지 수 계산
+    this.totalPages = Math.ceil(data.totalElements / this.pageSize);
       } catch (error) {
         console.error("Failed to fetch goouts:", error);
       }
@@ -145,10 +157,12 @@ export default {
       if (status === null) {
         this.filteredGoouts = this.goouts;
       } else {
-        this.filteredGoouts = this.goouts.filter(goout => goout.status === status);
+        this.filteredGoouts = this.goouts.filter(
+          (goout) => goout.status === status
+        );
       }
-    }
-  }
+    },
+  },
 };
 </script>
 <style scoped>
@@ -181,7 +195,7 @@ export default {
 }
 .button-container button:hover,
 .button-container2 button:hover {
-  background-color: #F75C29; /* 마우스를 올렸을 때 배경색을 주황색으로 변경 */
+  background-color: #f75c29; /* 마우스를 올렸을 때 배경색을 주황색으로 변경 */
   color: white;
 }
 .gooutList ul {
@@ -198,7 +212,8 @@ export default {
   width: 100%;
   border-collapse: collapse;
 }
-.gooutList th, .gooutList td {
+.gooutList th,
+.gooutList td {
   border: 1px solid #ddd;
   padding: 8px;
 }
