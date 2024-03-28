@@ -48,6 +48,10 @@
                             </tbody>
                           </table>
 
+                           <!-- 글쓰기 버튼 -->
+                           <button @click="goToBoardCreatePage">글쓰기</button>
+
+
                           <div class="pagination">
                             <a href="#" class="prev">&laquo; 이전</a>
                             <!-- 페이지 버튼은 자동으로 생성됩니다. -->
@@ -89,6 +93,10 @@ export default {
   methods: {
     viewBoardRead(id) {
       window.location.href = `/board/read/${id}`;
+    },
+    goToBoardCreatePage() {
+      // 글쓰기 페이지로 이동하는 메소드
+      window.location.href = "/board/create";
     },
     fetchBoardData(page) {
       const itemsPerPage = 6;
@@ -143,6 +151,13 @@ button:hover {
 
 button:active {
   background-color: #ff8c00;
+}
+
+button:not(:disabled){
+  cursor: pointer;
+  position: relative;
+  left: 888px;
+  bottom: -42px;
 }
 
 #commute-info {
